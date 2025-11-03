@@ -261,7 +261,7 @@ function History({ customer, onLogout, onStartSelection, onShowCoupon }) {
                 </div>
               ) : (
                 <div className="no-card">
-                  <div className="no-card-icon">🎴</div>
+                  <div className="no-card-icon">🃏</div>
                   <p>아직 카드를 선택하지 않았습니다</p>
                   <button 
                     className="btn btn-select"
@@ -281,4 +281,5 @@ function History({ customer, onLogout, onStartSelection, onShowCoupon }) {
 
 
 export default History;
+
 
