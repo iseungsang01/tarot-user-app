@@ -173,7 +173,7 @@ function History({ customer, onLogout, onStartSelection, onShowCoupon }) {
         <div className="loading">로딩 중...</div>
       ) : visits.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-icon">🎴</div>
+          <div className="empty-icon">🃏</div>
           <h3>아직 방문 기록이 없습니다</h3>
           <p>매장을 방문하고 첫 타로 카드를 선택해보세요!</p>
         </div>
@@ -278,5 +278,6 @@ function History({ customer, onLogout, onStartSelection, onShowCoupon }) {
     </div>
   );
 }
+
 
 export default History;
