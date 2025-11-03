@@ -200,7 +200,7 @@ function History({ customer, onLogout, onStartSelection, onShowCoupon }) {
               {visit.selected_card ? (
                 <div className="card-display">
                   <div className="card-emoji-large">
-                    {tarotEmojis[visit.selected_card] || '🎴'}
+                    {tarotEmojis[visit.selected_card] || '🃏'}
                   </div>
                   <div className="card-info">
                     <div className="card-name-large">{visit.selected_card}</div>
@@ -281,3 +281,4 @@ function History({ customer, onLogout, onStartSelection, onShowCoupon }) {
 
 
 export default History;
+
