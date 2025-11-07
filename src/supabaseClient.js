@@ -7,4 +7,5 @@ const AdminPassWord = process.env.REACT_APP_ADMIN_PASSWORD
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-export {AdminPassWord, supabase}
+export {supabase, AdminPassWord}
+
