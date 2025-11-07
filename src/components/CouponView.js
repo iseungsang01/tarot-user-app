@@ -478,7 +478,7 @@ function CouponView({ customer, onBack, onCouponUsed }) {
         <div className="loading">로딩 중...</div>
       ) : coupons.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-icon">🎫</div>
+          <div className="empty-icon">🎟️</div>
           <h3>보유한 쿠폰이 없습니다</h3>
           <p>스탬프 10개를 모아서 쿠폰을 받아보세요!</p>
         </div>
@@ -511,3 +511,4 @@ function CouponView({ customer, onBack, onCouponUsed }) {
 
 
 export default CouponView;
+
