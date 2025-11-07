@@ -57,7 +57,7 @@ function CouponView({ customer, onBack, onCouponUsed }) {
       return;
     }
 
-    if (password !== REACT_APP_ADMIN_PASSWORD) {
+    if (password !== AdminPassWord) {
       setMessage({ text: '비밀번호가 올바르지 않습니다.', type: 'error' });
       return;
     }
@@ -511,4 +511,5 @@ function CouponView({ customer, onBack, onCouponUsed }) {
 
 
 export default CouponView;
+
 
