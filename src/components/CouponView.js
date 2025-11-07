@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
+import { supabase, AdminPassWord } from '../supabaseClient';
 
 function CouponView({ customer, onBack, onCouponUsed }) {
   const [coupons, setCoupons] = useState([]);
@@ -511,5 +511,6 @@ function CouponView({ customer, onBack, onCouponUsed }) {
 
 
 export default CouponView;
+
 
 
