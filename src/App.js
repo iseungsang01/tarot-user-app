@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase, AdminPassWord } from './supabaseClient';
+import { supabase } from './supabaseClient';
 import LoginScreen from './components/LoginScreen';
 import CardSelection from './components/CardSelection';
 import History from './components/History';
