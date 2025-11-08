@@ -8,21 +8,24 @@ import CouponView from './components/CouponView';
 import './App.css';
 
 function App() {
-  const [currentView, setCurrentView] = useState('login');
+  const [currentView, setCurrentView] = useState('login'); // login, select, history, notice, coupon
   const [customer, setCustomer] = useState(null);
   const [currentVisitId, setCurrentVisitId] = useState(null);
   const [unreadNoticeCount, setUnreadNoticeCount] = useState(0);
 
   useEffect(() => {
+    // 로컬 스토리지에서 고객 정보 확인
     const savedCustomer = localStorage.getItem('tarot_customer');
     if (savedCustomer) {
       const customerData = JSON.parse(savedCustomer);
       setCustomer(customerData);
       setCurrentView('history');
+      // 최신 고객 정보 로드
       refreshCustomerData(customerData.id);
     }
   }, []);
 
+  // 고객 정보가 변경될 때마다 안 읽은 공지사항 개수 확인
   useEffect(() => {
     if (customer) {
       checkUnreadNotices();
@@ -52,6 +55,7 @@ function App() {
     if (!customer) return;
     
     try {
+      // 전체 공지사항 개수
       const { count: totalCount, error: totalError } = await supabase
         .from('notices')
         .select('*', { count: 'exact', head: true })
@@ -59,6 +63,7 @@ function App() {
 
       if (totalError) throw totalError;
 
+      // 읽은 공지사항 개수
       const { count: readCount, error: readError } = await supabase
         .from('notice_reads')
         .select('*', { count: 'exact', head: true })
@@ -119,6 +124,7 @@ function App() {
   };
 
   const handleNoticeRead = () => {
+    // 공지사항을 읽은 후 안 읽은 개수 업데이트
     checkUnreadNotices();
   };
 
