@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase, AdminPassWord } from '../supabaseClient';
+import { supabase } from '../supabaseClient';
 
 function CouponView({ customer, onBack, onCouponUsed }) {
   const [coupons, setCoupons] = useState([]);
@@ -57,7 +57,7 @@ function CouponView({ customer, onBack, onCouponUsed }) {
       return;
     }
 
-    if (password !== AdminPassWord) {
+    if (password !== 'admin1234') {
       setMessage({ text: '비밀번호가 올바르지 않습니다.', type: 'error' });
       return;
     }

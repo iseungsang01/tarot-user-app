@@ -173,7 +173,7 @@ function History({ customer, onLogout, onStartSelection, onShowCoupon }) {
         <div className="loading">로딩 중...</div>
       ) : visits.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-icon">🃏</div>
+          <div className="empty-icon">🎴</div>
           <h3>아직 방문 기록이 없습니다</h3>
           <p>매장을 방문하고 첫 타로 카드를 선택해보세요!</p>
         </div>
@@ -200,7 +200,7 @@ function History({ customer, onLogout, onStartSelection, onShowCoupon }) {
               {visit.selected_card ? (
                 <div className="card-display">
                   <div className="card-emoji-large">
-                    {tarotEmojis[visit.selected_card] || '🃏'}
+                    {tarotEmojis[visit.selected_card] || '🎴'}
                   </div>
                   <div className="card-info">
                     <div className="card-name-large">{visit.selected_card}</div>
@@ -261,7 +261,7 @@ function History({ customer, onLogout, onStartSelection, onShowCoupon }) {
                 </div>
               ) : (
                 <div className="no-card">
-                  <div className="no-card-icon">🃏</div>
+                  <div className="no-card-icon">🎴</div>
                   <p>아직 카드를 선택하지 않았습니다</p>
                   <button 
                     className="btn btn-select"
