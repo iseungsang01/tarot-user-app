@@ -7,7 +7,6 @@ function Notice({ onBack, customer, onNoticeRead }) {
   const [showReportForm, setShowReportForm] = useState(false);
   const [showMyReports, setShowMyReports] = useState(false);
   const [myReports, setMyReports] = useState([]);
-  const [unreadResponseCount, setUnreadResponseCount] = useState(0);
   
   // 버그 리포트 폼 상태
   const [reportData, setReportData] = useState({
@@ -27,10 +26,10 @@ function Notice({ onBack, customer, onNoticeRead }) {
     }
   }, [customer]);
 
-  // 내 접수 내역을 볼 때 답변 읽음 처리
+  // 내 접수 내역을 볼 때 자동으로 읽음 처리
   useEffect(() => {
     if (showMyReports && customer) {
-      markResponsesAsRead();
+      markReportsAsRead();
     }
   }, [showMyReports]);
 
@@ -95,29 +94,23 @@ function Notice({ onBack, customer, onNoticeRead }) {
 
       if (error) throw error;
       setMyReports(data || []);
-      
-      // 안 읽은 답변 개수 계산
-      const unreadCount = (data || []).filter(
-        report => report.admin_response && !report.response_read
-      ).length;
-      setUnreadResponseCount(unreadCount);
     } catch (error) {
       console.error('Load my reports error:', error);
     }
   };
 
-  const markResponsesAsRead = async () => {
+  const markReportsAsRead = async () => {
     if (!customer) return;
     
     try {
       // 답변이 있고 읽지 않은 모든 리포트를 읽음 처리
-      const reportsWithUnreadResponse = myReports.filter(
+      const unreadReports = myReports.filter(
         report => report.admin_response && !report.response_read
       );
 
-      if (reportsWithUnreadResponse.length === 0) return;
+      if (unreadReports.length === 0) return;
 
-      for (const report of reportsWithUnreadResponse) {
+      for (const report of unreadReports) {
         await supabase
           .from('bug_reports')
           .update({ response_read: true })
@@ -127,14 +120,12 @@ function Notice({ onBack, customer, onNoticeRead }) {
       // 업데이트 후 다시 로드
       await loadMyReports();
       
-      // 읽음 처리 후 약간의 지연을 두고 상위 컴포넌트에 알림
-      setTimeout(() => {
-        if (onNoticeRead) {
-          onNoticeRead();
-        }
-      }, 500);
+      // 상위 컴포넌트에 알림
+      if (onNoticeRead) {
+        onNoticeRead();
+      }
     } catch (error) {
-      console.error('Mark responses as read error:', error);
+      console.error('Mark reports as read error:', error);
     }
   };
 
@@ -168,6 +159,7 @@ function Notice({ onBack, customer, onNoticeRead }) {
           report_type: reportData.report_type,
           category: reportData.category,
           status: '접수',
+          response_read: false
         });
 
       if (error) throw error;
@@ -270,8 +262,7 @@ function Notice({ onBack, customer, onNoticeRead }) {
             className="btn-report"
             style={{ 
               background: 'linear-gradient(135deg, #2196f3 0%, #1976d2 100%)',
-              borderColor: '#2196f3',
-              position: 'relative'
+              borderColor: '#2196f3'
             }}
             onClick={() => {
               setShowMyReports(!showMyReports);
@@ -279,20 +270,6 @@ function Notice({ onBack, customer, onNoticeRead }) {
             }}
           >
             {showMyReports ? '✖ 닫기' : `📋 내 접수 내역 (${myReports.length})`}
-            {!showMyReports && unreadResponseCount > 0 && (
-              <span 
-                className="notification-badge"
-                style={{
-                  position: 'absolute',
-                  top: '-8px',
-                  right: '-8px',
-                  background: '#2196f3',
-                  boxShadow: '0 2px 8px rgba(33, 150, 243, 0.6)'
-                }}
-              >
-                {unreadResponseCount}
-              </span>
-            )}
           </button>
         </div>
       </div>
@@ -315,42 +292,18 @@ function Notice({ onBack, customer, onNoticeRead }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               {myReports.map((report) => {
                 const categoryBadge = getCategoryBadge(report.category);
-                const hasUnreadResponse = report.admin_response && !report.response_read;
                 
                 return (
                   <div 
                     key={report.id} 
                     style={{
-                      background: hasUnreadResponse 
-                        ? 'rgba(33, 150, 243, 0.15)' 
-                        : 'rgba(138, 43, 226, 0.1)',
-                      border: hasUnreadResponse 
-                        ? '3px solid #2196f3' 
-                        : '2px solid #8a2be2',
+                      background: 'rgba(138, 43, 226, 0.1)',
+                      border: '2px solid #8a2be2',
                       borderRadius: '10px',
                       padding: '15px',
                       position: 'relative'
                     }}
                   >
-                    {hasUnreadResponse && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '-10px',
-                        right: '20px',
-                        background: 'linear-gradient(135deg, #2196f3 0%, #1976d2 100%)',
-                        color: 'white',
-                        padding: '5px 12px',
-                        borderRadius: '20px',
-                        fontSize: '12px',
-                        fontWeight: '700',
-                        border: '2px solid #2196f3',
-                        boxShadow: '0 4px 12px rgba(33, 150, 243, 0.6)',
-                        animation: 'pulse 2s infinite'
-                      }}>
-                        💬 새 답변
-                      </div>
-                    )}
-                    
                     <div style={{ 
                       display: 'flex', 
                       justifyContent: 'space-between', 
@@ -411,37 +364,19 @@ function Notice({ onBack, customer, onNoticeRead }) {
                     
                     {report.admin_response && (
                       <div style={{
-                        background: hasUnreadResponse 
-                          ? 'rgba(33, 150, 243, 0.2)' 
-                          : 'rgba(76, 175, 80, 0.1)',
-                        border: hasUnreadResponse 
-                          ? '2px solid #2196f3' 
-                          : '2px solid #4caf50',
+                        background: 'rgba(76, 175, 80, 0.1)',
+                        border: '2px solid #4caf50',
                         borderRadius: '8px',
                         padding: '10px',
                         marginTop: '10px'
                       }}>
                         <div style={{ 
-                          color: hasUnreadResponse ? '#2196f3' : '#4caf50', 
+                          color: '#4caf50', 
                           fontSize: '12px', 
                           fontWeight: '600',
-                          marginBottom: '5px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '5px'
+                          marginBottom: '5px'
                         }}>
                           💬 관리자 답변
-                          {hasUnreadResponse && (
-                            <span style={{
-                              background: '#2196f3',
-                              color: 'white',
-                              padding: '2px 6px',
-                              borderRadius: '10px',
-                              fontSize: '10px'
-                            }}>
-                              NEW
-                            </span>
-                          )}
                         </div>
                         <div style={{ color: 'white', fontSize: '14px', lineHeight: '1.5' }}>
                           {report.admin_response}
