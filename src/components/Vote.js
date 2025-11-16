@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 
-function Vote({ onBack, customer }) {
+function Vote({ customer, onBack }) {
   const [votes, setVotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedVote, setSelectedVote] = useState(null);
   const [selectedOptions, setSelectedOptions] = useState([]);
+  const [myVote, setMyVote] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
-  const [showResults, setShowResults] = useState({});
+  const [showResults, setShowResults] = useState(false);
   const [voteResults, setVoteResults] = useState({});
 
   useEffect(() => {
     loadVotes();
-  }, [customer]);
+  }, []);
 
   const loadVotes = async () => {
     try {
@@ -24,39 +25,32 @@ function Vote({ onBack, customer }) {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-
-      // 각 투표에 대한 사용자 참여 여부 확인
-      const votesWithStatus = await Promise.all(
-        (data || []).map(async (vote) => {
-          const { data: response } = await supabase
-            .from('vote_responses')
-            .select('*')
-            .eq('vote_id', vote.id)
-            .eq('customer_id', customer.id)
-            .single();
-
-          return {
-            ...vote,
-            hasVoted: !!response,
-            userResponse: response
-          };
-        })
-      );
-
-      setVotes(votesWithStatus);
-
-      // 모든 투표 결과 미리 로드
-      const results = {};
-      for (const vote of votesWithStatus) {
-        const result = await loadVoteResults(vote.id);
-        results[vote.id] = result;
-      }
-      setVoteResults(results);
-
+      setVotes(data || []);
     } catch (error) {
       console.error('Load votes error:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMyVote = async (voteId) => {
+    try {
+      const { data, error } = await supabase
+        .from('vote_responses')
+        .select('*')
+        .eq('vote_id', voteId)
+        .eq('customer_id', customer.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      
+      setMyVote(data);
+      if (data) {
+        setSelectedOptions(data.selected_options || []);
+      }
+    } catch (error) {
+      console.error('Load my vote error:', error);
+      setMyVote(null);
     }
   };
 
@@ -69,109 +63,127 @@ function Vote({ onBack, customer }) {
 
       if (error) throw error;
 
-      // 옵션별 득표수 계산
-      const optionCounts = {};
+      const results = {};
       (data || []).forEach(response => {
-        const options = response.selected_options;
-        options.forEach(optionId => {
-          optionCounts[optionId] = (optionCounts[optionId] || 0) + 1;
+        (response.selected_options || []).forEach(optionId => {
+          results[optionId] = (results[optionId] || 0) + 1;
         });
       });
 
-      return {
-        totalVotes: data.length,
-        optionCounts
-      };
+      setVoteResults(results);
     } catch (error) {
       console.error('Load vote results error:', error);
-      return { totalVotes: 0, optionCounts: {} };
     }
   };
 
-  const handleOptionToggle = (vote, optionId) => {
-    if (vote.hasVoted) return;
+  const handleVoteSelect = async (vote) => {
+    setSelectedVote(vote);
+    setSelectedOptions([]);
+    setMessage({ text: '', type: '' });
+    setShowResults(false);
+    await loadMyVote(vote.id);
+    await loadVoteResults(vote.id);
+  };
 
-    if (vote.allow_multiple) {
-      setSelectedOptions(prev => {
-        if (prev.includes(optionId)) {
-          return prev.filter(id => id !== optionId);
-        } else if (prev.length < vote.max_selections) {
-          return [...prev, optionId];
-        }
-        return prev;
-      });
+  const handleOptionToggle = (optionId) => {
+    if (!selectedVote) return;
+
+    const isMultiple = selectedVote.allow_multiple;
+    const maxSelections = selectedVote.max_selections || 1;
+
+    if (selectedOptions.includes(optionId)) {
+      setSelectedOptions(selectedOptions.filter(id => id !== optionId));
     } else {
-      setSelectedOptions([optionId]);
+      if (isMultiple) {
+        if (selectedOptions.length < maxSelections) {
+          setSelectedOptions([...selectedOptions, optionId]);
+        } else {
+          setMessage({ 
+            text: `최대 ${maxSelections}개까지만 선택 가능합니다.`, 
+            type: 'error' 
+          });
+        }
+      } else {
+        setSelectedOptions([optionId]);
+      }
     }
   };
 
-  const handleSubmitVote = async (vote) => {
+  const handleSubmitVote = async () => {
+    if (!selectedVote) return;
+
     if (selectedOptions.length === 0) {
       setMessage({ text: '투표할 항목을 선택해주세요.', type: 'error' });
       return;
     }
 
-    if (vote.allow_multiple && selectedOptions.length > vote.max_selections) {
-      setMessage({ text: `최대 ${vote.max_selections}개까지 선택 가능합니다.`, type: 'error' });
+    const isMultiple = selectedVote.allow_multiple;
+    const minSelections = 1;
+    const maxSelections = selectedVote.max_selections || 1;
+
+    if (selectedOptions.length < minSelections) {
+      setMessage({ text: '최소 1개 이상 선택해주세요.', type: 'error' });
+      return;
+    }
+
+    if (isMultiple && selectedOptions.length > maxSelections) {
+      setMessage({ text: `최대 ${maxSelections}개까지만 선택 가능합니다.`, type: 'error' });
       return;
     }
 
     setSubmitting(true);
 
     try {
-      const { error } = await supabase
-        .from('vote_responses')
-        .insert({
-          vote_id: vote.id,
-          customer_id: customer.id,
-          selected_options: selectedOptions
-        });
+      // 기존 투표가 있으면 수정, 없으면 새로 삽입
+      if (myVote) {
+        // 투표 수정
+        const { error } = await supabase
+          .from('vote_responses')
+          .update({
+            selected_options: selectedOptions,
+            voted_at: new Date().toISOString()
+          })
+          .eq('id', myVote.id);
 
-      if (error) {
-        if (error.code === '23505') {
-          setMessage({ text: '이미 투표하셨습니다.', type: 'error' });
-        } else {
-          throw error;
-        }
-        return;
+        if (error) throw error;
+        setMessage({ text: '✅ 투표가 수정되었습니다!', type: 'success' });
+      } else {
+        // 새 투표
+        const { error } = await supabase
+          .from('vote_responses')
+          .insert({
+            vote_id: selectedVote.id,
+            customer_id: customer.id,
+            selected_options: selectedOptions
+          });
+
+        if (error) throw error;
+        setMessage({ text: '✅ 투표가 완료되었습니다!', type: 'success' });
       }
 
-      setMessage({ text: '✅ 투표가 완료되었습니다!', type: 'success' });
-      setSelectedOptions([]);
-      setSelectedVote(null);
-      
-      // 투표 목록 새로고침
-      await loadVotes();
+      await loadMyVote(selectedVote.id);
+      await loadVoteResults(selectedVote.id);
+      setShowResults(true);
 
       setTimeout(() => {
         setMessage({ text: '', type: '' });
-      }, 2000);
+      }, 3000);
 
     } catch (error) {
       console.error('Submit vote error:', error);
-      setMessage({ text: '투표 중 오류가 발생했습니다.', type: 'error' });
+      setMessage({ text: '투표 중 오류가 발생했습니다: ' + error.message, type: 'error' });
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleToggleResults = async (voteId) => {
-    setShowResults(prev => ({
-      ...prev,
-      [voteId]: !prev[voteId]
-    }));
-
-    if (!showResults[voteId]) {
-      const result = await loadVoteResults(voteId);
-      setVoteResults(prev => ({
-        ...prev,
-        [voteId]: result
-      }));
-    }
+  const handleEditVote = () => {
+    setShowResults(false);
+    setMessage({ text: '', type: '' });
   };
 
   const formatDate = (dateStr) => {
-    if (!dateStr) return null;
+    if (!dateStr) return '제한 없음';
     const date = new Date(dateStr);
     return date.toLocaleDateString('ko-KR', {
       year: 'numeric',
@@ -182,23 +194,449 @@ function Vote({ onBack, customer }) {
     });
   };
 
-  const isVoteExpired = (endsAt) => {
-    if (!endsAt) return false;
-    return new Date(endsAt) < new Date();
+  const getTotalVotes = () => {
+    return Object.values(voteResults).reduce((sum, count) => sum + count, 0);
   };
 
-  const getVotePercentage = (voteId, optionId) => {
-    const result = voteResults[voteId];
-    if (!result || result.totalVotes === 0) return 0;
-    
-    const optionVotes = result.optionCounts[optionId] || 0;
-    return Math.round((optionVotes / result.totalVotes) * 100);
+  const getOptionPercentage = (optionId) => {
+    const total = getTotalVotes();
+    if (total === 0) return 0;
+    return Math.round(((voteResults[optionId] || 0) / total) * 100);
   };
 
-  const getOptionVotes = (voteId, optionId) => {
-    const result = voteResults[voteId];
-    if (!result) return 0;
-    return result.optionCounts[optionId] || 0;
+  const renderVoteList = () => (
+    <div className="vote-list-section">
+      <h3>📊 진행 중인 투표</h3>
+      {votes.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-icon">🗳️</div>
+          <h3>진행 중인 투표가 없습니다</h3>
+        </div>
+      ) : (
+        <div className="vote-list">
+          {votes.map((vote) => (
+            <div
+              key={vote.id}
+              className="vote-item"
+              onClick={() => handleVoteSelect(vote)}
+              style={{
+                background: 'rgba(138, 43, 226, 0.2)',
+                border: '3px solid var(--purple-light)',
+                borderRadius: '15px',
+                padding: '20px',
+                cursor: 'pointer',
+                transition: 'all 0.3s',
+                marginBottom: '15px'
+              }}
+            >
+              <div style={{ marginBottom: '10px' }}>
+                <span style={{
+                  background: 'rgba(138, 43, 226, 0.3)',
+                  color: 'var(--gold)',
+                  padding: '4px 10px',
+                  borderRadius: '15px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  marginRight: '8px'
+                }}>
+                  {vote.allow_multiple ? `복수선택 (최대 ${vote.max_selections}개)` : '단일선택'}
+                </span>
+                {vote.is_anonymous && (
+                  <span style={{
+                    background: 'rgba(76, 175, 80, 0.3)',
+                    color: '#4caf50',
+                    padding: '4px 10px',
+                    borderRadius: '15px',
+                    fontSize: '12px',
+                    fontWeight: '600'
+                  }}>
+                    익명투표
+                  </span>
+                )}
+              </div>
+              
+              <div style={{ 
+                color: 'var(--gold)', 
+                fontSize: '20px', 
+                fontWeight: '700',
+                marginBottom: '8px'
+              }}>
+                {vote.title}
+              </div>
+              
+              {vote.description && (
+                <div style={{ 
+                  color: 'var(--lavender)', 
+                  fontSize: '14px',
+                  marginBottom: '12px',
+                  lineHeight: '1.5'
+                }}>
+                  {vote.description}
+                </div>
+              )}
+              
+              <div style={{ 
+                color: 'var(--lavender)', 
+                fontSize: '13px',
+                opacity: 0.8,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <span>📅 마감: {formatDate(vote.ends_at)}</span>
+                <span style={{ 
+                  background: 'rgba(138, 43, 226, 0.3)',
+                  padding: '4px 10px',
+                  borderRadius: '10px',
+                  fontSize: '12px'
+                }}>
+                  {vote.options?.length || 0}개 항목
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderVoteDetail = () => {
+    if (!selectedVote) return null;
+
+    const options = selectedVote.options || [];
+    const totalVotes = getTotalVotes();
+    const hasVoted = myVote !== null;
+
+    return (
+      <div className="vote-detail-section">
+        <button 
+          className="btn-back" 
+          onClick={() => {
+            setSelectedVote(null);
+            setSelectedOptions([]);
+            setMyVote(null);
+            setShowResults(false);
+            setMessage({ text: '', type: '' });
+          }}
+          style={{ marginBottom: '20px' }}
+        >
+          ← 목록으로
+        </button>
+
+        <div style={{
+          background: 'var(--gradient-purple)',
+          border: '3px solid var(--gold)',
+          borderRadius: '20px',
+          padding: '30px',
+          marginBottom: '20px',
+          boxShadow: '0 20px 60px rgba(255, 215, 0, 0.3)'
+        }}>
+          <div style={{ marginBottom: '15px' }}>
+            <span style={{
+              background: 'rgba(138, 43, 226, 0.3)',
+              color: 'var(--gold)',
+              padding: '6px 12px',
+              borderRadius: '15px',
+              fontSize: '13px',
+              fontWeight: '600',
+              marginRight: '8px'
+            }}>
+              {selectedVote.allow_multiple ? `복수선택 (최대 ${selectedVote.max_selections}개)` : '단일선택'}
+            </span>
+            {selectedVote.is_anonymous && (
+              <span style={{
+                background: 'rgba(76, 175, 80, 0.3)',
+                color: '#4caf50',
+                padding: '6px 12px',
+                borderRadius: '15px',
+                fontSize: '13px',
+                fontWeight: '600'
+              }}>
+                익명투표
+              </span>
+            )}
+          </div>
+
+          <h2 style={{ 
+            color: 'var(--gold)', 
+            fontSize: '26px',
+            marginBottom: '15px',
+            textShadow: '0 0 10px rgba(255, 215, 0, 0.5)'
+          }}>
+            {selectedVote.title}
+          </h2>
+
+          {selectedVote.description && (
+            <p style={{ 
+              color: 'var(--lavender)', 
+              fontSize: '16px',
+              marginBottom: '20px',
+              lineHeight: '1.6'
+            }}>
+              {selectedVote.description}
+            </p>
+          )}
+
+          <div style={{ 
+            display: 'flex',
+            gap: '15px',
+            flexWrap: 'wrap',
+            marginTop: '20px'
+          }}>
+            <div style={{
+              background: 'rgba(138, 43, 226, 0.2)',
+              border: '2px solid var(--purple-light)',
+              borderRadius: '10px',
+              padding: '12px 20px',
+              flex: 1,
+              minWidth: '150px'
+            }}>
+              <div style={{ color: 'var(--lavender)', fontSize: '13px', marginBottom: '5px' }}>
+                📅 마감일
+              </div>
+              <div style={{ color: 'white', fontSize: '15px', fontWeight: '600' }}>
+                {formatDate(selectedVote.ends_at)}
+              </div>
+            </div>
+
+            <div style={{
+              background: 'rgba(138, 43, 226, 0.2)',
+              border: '2px solid var(--purple-light)',
+              borderRadius: '10px',
+              padding: '12px 20px',
+              flex: 1,
+              minWidth: '150px'
+            }}>
+              <div style={{ color: 'var(--lavender)', fontSize: '13px', marginBottom: '5px' }}>
+                🗳️ 총 투표 수
+              </div>
+              <div style={{ color: 'white', fontSize: '15px', fontWeight: '600' }}>
+                {totalVotes}표
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 투표 상태 표시 */}
+        {hasVoted && !showResults && (
+          <div style={{
+            background: 'rgba(76, 175, 80, 0.2)',
+            border: '2px solid #4caf50',
+            borderRadius: '15px',
+            padding: '15px',
+            marginBottom: '20px',
+            textAlign: 'center'
+          }}>
+            <div style={{ color: '#4caf50', fontSize: '16px', fontWeight: '600' }}>
+              ✓ 이미 투표하셨습니다
+            </div>
+            <div style={{ color: 'var(--lavender)', fontSize: '14px', marginTop: '5px' }}>
+              투표를 수정하거나 결과를 확인할 수 있습니다
+            </div>
+          </div>
+        )}
+
+        {/* 투표 옵션 또는 결과 */}
+        {showResults || (hasVoted && !submitting) ? (
+          // 결과 보기 모드
+          <div>
+            <h3 style={{ 
+              color: 'var(--gold)', 
+              marginBottom: '20px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <span>📊 투표 결과</span>
+              {hasVoted && (
+                <button
+                  onClick={handleEditVote}
+                  style={{
+                    background: 'rgba(138, 43, 226, 0.3)',
+                    color: 'var(--gold)',
+                    border: '2px solid var(--purple-light)',
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s'
+                  }}
+                >
+                  ✏️ 투표 수정
+                </button>
+              )}
+            </h3>
+            {options.map((option) => {
+              const votes = voteResults[option.id] || 0;
+              const percentage = getOptionPercentage(option.id);
+              const isMyChoice = selectedOptions.includes(option.id);
+
+              return (
+                <div
+                  key={option.id}
+                  style={{
+                    background: isMyChoice 
+                      ? 'rgba(255, 215, 0, 0.15)' 
+                      : 'rgba(138, 43, 226, 0.2)',
+                    border: isMyChoice 
+                      ? '3px solid var(--gold)' 
+                      : '2px solid var(--purple-light)',
+                    borderRadius: '15px',
+                    padding: '20px',
+                    marginBottom: '15px',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}
+                >
+                  {/* 진행바 배경 */}
+                  <div style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: `${percentage}%`,
+                    background: isMyChoice
+                      ? 'linear-gradient(90deg, rgba(255, 215, 0, 0.3) 0%, rgba(255, 215, 0, 0.1) 100%)'
+                      : 'linear-gradient(90deg, rgba(138, 43, 226, 0.4) 0%, rgba(138, 43, 226, 0.1) 100%)',
+                    transition: 'width 0.5s ease',
+                    borderRadius: '12px'
+                  }} />
+
+                  <div style={{ position: 'relative', zIndex: 1 }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '8px'
+                    }}>
+                      <div style={{ 
+                        color: isMyChoice ? 'var(--gold)' : 'white',
+                        fontSize: '16px',
+                        fontWeight: '700',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}>
+                        {isMyChoice && <span>✓</span>}
+                        {option.text}
+                      </div>
+                      <div style={{ 
+                        color: 'var(--gold)',
+                        fontSize: '18px',
+                        fontWeight: '700'
+                      }}>
+                        {percentage}%
+                      </div>
+                    </div>
+                    <div style={{ 
+                      color: 'var(--lavender)', 
+                      fontSize: '14px'
+                    }}>
+                      {votes}표
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {hasVoted && (
+              <div style={{
+                background: 'rgba(138, 43, 226, 0.1)',
+                border: '2px solid var(--purple-light)',
+                borderRadius: '15px',
+                padding: '15px',
+                marginTop: '20px',
+                textAlign: 'center'
+              }}>
+                <div style={{ color: 'var(--lavender)', fontSize: '14px' }}>
+                  💡 투표를 수정하려면 "투표 수정" 버튼을 눌러주세요
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          // 투표하기 모드
+          <div>
+            <h3 style={{ color: 'var(--gold)', marginBottom: '20px' }}>
+              🗳️ 투표하기
+              {hasVoted && <span style={{ color: 'var(--lavender)', fontSize: '14px', marginLeft: '10px' }}>(수정 모드)</span>}
+            </h3>
+            {options.map((option) => {
+              const isSelected = selectedOptions.includes(option.id);
+
+              return (
+                <div
+                  key={option.id}
+                  onClick={() => handleOptionToggle(option.id)}
+                  style={{
+                    background: isSelected 
+                      ? 'rgba(255, 215, 0, 0.15)' 
+                      : 'rgba(138, 43, 226, 0.2)',
+                    border: isSelected 
+                      ? '3px solid var(--gold)' 
+                      : '2px solid var(--purple-light)',
+                    borderRadius: '15px',
+                    padding: '20px',
+                    marginBottom: '15px',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '15px'
+                  }}
+                >
+                  <div style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: selectedVote.allow_multiple ? '6px' : '50%',
+                    border: `3px solid ${isSelected ? 'var(--gold)' : 'var(--purple-light)'}`,
+                    background: isSelected ? 'var(--gold)' : 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    transition: 'all 0.3s'
+                  }}>
+                    {isSelected && (
+                      <span style={{ color: 'var(--purple-dark)', fontSize: '14px', fontWeight: '700' }}>
+                        ✓
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ 
+                    color: isSelected ? 'var(--gold)' : 'white',
+                    fontSize: '16px',
+                    fontWeight: isSelected ? '700' : '600'
+                  }}>
+                    {option.text}
+                  </div>
+                </div>
+              );
+            })}
+
+            <button
+              className="btn btn-primary"
+              onClick={handleSubmitVote}
+              disabled={submitting || selectedOptions.length === 0}
+              style={{ 
+                width: '100%',
+                marginTop: '20px',
+                padding: '18px'
+              }}
+            >
+              {submitting ? '처리 중...' : hasVoted ? '✏️ 투표 수정하기' : '✓ 투표하기'}
+            </button>
+
+            {message.text && (
+              <div className={`message ${message.type}`}>
+                {message.text}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -213,155 +651,10 @@ function Vote({ onBack, customer }) {
 
       {loading ? (
         <div className="loading">로딩 중...</div>
-      ) : votes.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">🗳️</div>
-          <h3>진행 중인 투표가 없습니다</h3>
-          <p>새로운 투표가 등록되면 알려드릴게요</p>
-        </div>
+      ) : selectedVote ? (
+        renderVoteDetail()
       ) : (
-        <div className="vote-list">
-          {votes.map((vote) => {
-            const expired = isVoteExpired(vote.ends_at);
-            const options = vote.options || [];
-            const result = voteResults[vote.id] || { totalVotes: 0, optionCounts: {} };
-
-            return (
-              <div key={vote.id} className="vote-card">
-                <div className="vote-card-header">
-                  <div>
-                    <h3 className="vote-title">{vote.title}</h3>
-                    {vote.description && (
-                      <p className="vote-description">{vote.description}</p>
-                    )}
-                  </div>
-                  
-                  <div className="vote-badges">
-                    {vote.hasVoted && (
-                      <span className="vote-badge voted">
-                        ✓ 투표 완료
-                      </span>
-                    )}
-                    {expired && (
-                      <span className="vote-badge expired">
-                        ⏰ 마감
-                      </span>
-                    )}
-                    {vote.allow_multiple && (
-                      <span className="vote-badge multiple">
-                        복수선택 (최대 {vote.max_selections}개)
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {vote.ends_at && (
-                  <div className="vote-deadline">
-                    <span className="deadline-label">마감:</span>
-                    <span className={expired ? 'deadline-expired' : 'deadline-active'}>
-                      {formatDate(vote.ends_at)}
-                    </span>
-                  </div>
-                )}
-
-                <div className="vote-options">
-                  {options.map((option) => {
-                    const isSelected = selectedOptions.includes(option.id);
-                    const isUserChoice = vote.hasVoted && 
-                      vote.userResponse?.selected_options?.includes(option.id);
-                    const percentage = getVotePercentage(vote.id, option.id);
-                    const optionVotes = getOptionVotes(vote.id, option.id);
-                    const showingResults = showResults[vote.id] || vote.hasVoted;
-
-                    return (
-                      <div
-                        key={option.id}
-                        className={`vote-option ${isSelected ? 'selected' : ''} ${
-                          vote.hasVoted || expired ? 'disabled' : ''
-                        } ${isUserChoice ? 'user-choice' : ''}`}
-                        onClick={() => {
-                          if (!vote.hasVoted && !expired) {
-                            handleOptionToggle(vote, option.id);
-                          }
-                        }}
-                      >
-                        <div className="option-content">
-                          <div className="option-text">
-                            {!vote.hasVoted && !expired && (
-                              <input
-                                type={vote.allow_multiple ? 'checkbox' : 'radio'}
-                                checked={isSelected}
-                                onChange={() => {}}
-                                disabled={vote.hasVoted || expired}
-                              />
-                            )}
-                            <span>{option.text}</span>
-                            {isUserChoice && (
-                              <span className="my-vote-badge">내 선택</span>
-                            )}
-                          </div>
-
-                          {showingResults && (
-                            <div className="option-stats">
-                              <span className="option-percentage">{percentage}%</span>
-                              <span className="option-votes">({optionVotes}표)</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {showingResults && (
-                          <div className="vote-progress-bar">
-                            <div 
-                              className="vote-progress-fill"
-                              style={{ 
-                                width: `${percentage}%`,
-                                background: isUserChoice 
-                                  ? 'linear-gradient(135deg, #ffd700 0%, #ffed4e 100%)'
-                                  : 'linear-gradient(135deg, #8a2be2 0%, #9370db 100%)'
-                              }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="vote-footer">
-                  <div className="vote-info">
-                    <span className="vote-total">
-                      💬 총 {result.totalVotes}명 참여
-                    </span>
-                    {!vote.is_anonymous && (
-                      <button
-                        className="btn-toggle-results"
-                        onClick={() => handleToggleResults(vote.id)}
-                      >
-                        {showResults[vote.id] ? '🙈 결과 숨기기' : '👁️ 결과 보기'}
-                      </button>
-                    )}
-                  </div>
-
-                  {!vote.hasVoted && !expired && selectedOptions.length > 0 && (
-                    <button
-                      className="btn btn-primary btn-submit-vote"
-                      onClick={() => handleSubmitVote(vote)}
-                      disabled={submitting}
-                    >
-                      {submitting ? '투표 중...' : '투표하기'}
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {message.text && (
-        <div className={`message ${message.type}`}>
-          {message.text}
-        </div>
+        renderVoteList()
       )}
     </div>
   );
