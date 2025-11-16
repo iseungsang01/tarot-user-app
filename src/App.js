@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { supabase, AdminPassWord } from './supabaseClient';
+import { supabase } from './supabaseClient';
 import LoginScreen from './components/LoginScreen';
 import CardSelection from './components/CardSelection';
 import History from './components/History';
 import Notice from './components/Notice';
 import CouponView from './components/CouponView';
+import Vote from './components/Vote';
 import './App.css';
 
 function App() {
-  const [currentView, setCurrentView] = useState('login'); // login, select, history, notice, coupon
+  const [currentView, setCurrentView] = useState('login'); // login, select, history, notice, coupon, vote
   const [customer, setCustomer] = useState(null);
   const [currentVisitId, setCurrentVisitId] = useState(null);
   const [unreadNoticeCount, setUnreadNoticeCount] = useState(0);
@@ -110,6 +111,10 @@ function App() {
     setCurrentView('coupon');
   };
 
+  const handleShowVote = () => {
+    setCurrentView('vote');
+  };
+
   const handleBackToHistory = () => {
     if (customer) {
       refreshCustomerData(customer.id);
@@ -159,6 +164,10 @@ function App() {
               <div className="nav-icon">🎟️</div>
               <div className="nav-label">쿠폰</div>
             </button>
+            <button className="nav-btn" onClick={handleShowVote}>
+              <div className="nav-icon">🗳️</div>
+              <div className="nav-label">투표</div>
+            </button>
             <button className="nav-btn" onClick={handleShowNotice}>
               <div className="nav-icon">
                 📢
@@ -166,7 +175,7 @@ function App() {
                   <span className="notification-badge">{unreadNoticeCount}</span>
                 )}
               </div>
-              <div className="nav-label">공지사항</div>
+              <div className="nav-label">공지</div>
             </button>
           </div>
         </>
@@ -188,6 +197,10 @@ function App() {
               <div className="nav-icon">🎟️</div>
               <div className="nav-label">쿠폰</div>
             </button>
+            <button className="nav-btn" onClick={handleShowVote}>
+              <div className="nav-icon">🗳️</div>
+              <div className="nav-label">투표</div>
+            </button>
             <button className="nav-btn" onClick={handleShowNotice}>
               <div className="nav-icon">
                 📢
@@ -195,7 +208,39 @@ function App() {
                   <span className="notification-badge">{unreadNoticeCount}</span>
                 )}
               </div>
-              <div className="nav-label">공지사항</div>
+              <div className="nav-label">공지</div>
+            </button>
+          </div>
+        </>
+      )}
+
+      {currentView === 'vote' && customer && (
+        <>
+          <Vote 
+            customer={customer}
+            onBack={handleBackToHistory}
+          />
+          <div className="bottom-nav">
+            <button className="nav-btn" onClick={handleBackToHistory}>
+              <div className="nav-icon">🏠</div>
+              <div className="nav-label">홈</div>
+            </button>
+            <button className="nav-btn" onClick={handleShowCoupon}>
+              <div className="nav-icon">🎟️</div>
+              <div className="nav-label">쿠폰</div>
+            </button>
+            <button className="nav-btn active">
+              <div className="nav-icon">🗳️</div>
+              <div className="nav-label">투표</div>
+            </button>
+            <button className="nav-btn" onClick={handleShowNotice}>
+              <div className="nav-icon">
+                📢
+                {unreadNoticeCount > 0 && (
+                  <span className="notification-badge">{unreadNoticeCount}</span>
+                )}
+              </div>
+              <div className="nav-label">공지</div>
             </button>
           </div>
         </>
@@ -217,9 +262,13 @@ function App() {
               <div className="nav-icon">🎟️</div>
               <div className="nav-label">쿠폰</div>
             </button>
+            <button className="nav-btn" onClick={handleShowVote}>
+              <div className="nav-icon">🗳️</div>
+              <div className="nav-label">투표</div>
+            </button>
             <button className="nav-btn active">
               <div className="nav-icon">📢</div>
-              <div className="nav-label">공지사항</div>
+              <div className="nav-label">공지</div>
             </button>
           </div>
         </>
