@@ -11,6 +11,7 @@ function Vote({ customer, onBack }) {
   const [message, setMessage] = useState({ text: '', type: '' });
   const [showResults, setShowResults] = useState(false);
   const [voteResults, setVoteResults] = useState({});
+  const [isEditMode, setIsEditMode] = useState(false);
 
   useEffect(() => {
     loadVotes();
@@ -47,10 +48,14 @@ function Vote({ customer, onBack }) {
       setMyVote(data);
       if (data) {
         setSelectedOptions(data.selected_options || []);
+        setShowResults(true); // 기존 투표가 있으면 결과 보기 모드
+      } else {
+        setShowResults(false); // 투표 안했으면 투표 모드
       }
     } catch (error) {
       console.error('Load my vote error:', error);
       setMyVote(null);
+      setShowResults(false);
     }
   };
 
@@ -81,6 +86,7 @@ function Vote({ customer, onBack }) {
     setSelectedOptions([]);
     setMessage({ text: '', type: '' });
     setShowResults(false);
+    setIsEditMode(false);
     await loadMyVote(vote.id);
     await loadVoteResults(vote.id);
   };
@@ -164,6 +170,7 @@ function Vote({ customer, onBack }) {
       await loadMyVote(selectedVote.id);
       await loadVoteResults(selectedVote.id);
       setShowResults(true);
+      setIsEditMode(false);
 
       setTimeout(() => {
         setMessage({ text: '', type: '' });
@@ -178,7 +185,19 @@ function Vote({ customer, onBack }) {
   };
 
   const handleEditVote = () => {
+    console.log('수정 버튼 클릭됨'); // 디버그용
     setShowResults(false);
+    setIsEditMode(true);
+    setMessage({ text: '', type: '' });
+  };
+
+  const handleCancelEdit = () => {
+    setShowResults(true);
+    setIsEditMode(false);
+    // 원래 투표로 복원
+    if (myVote) {
+      setSelectedOptions(myVote.selected_options || []);
+    }
     setMessage({ text: '', type: '' });
   };
 
@@ -316,6 +335,7 @@ function Vote({ customer, onBack }) {
             setSelectedOptions([]);
             setMyVote(null);
             setShowResults(false);
+            setIsEditMode(false);
             setMessage({ text: '', type: '' });
           }}
           style={{ marginBottom: '20px' }}
@@ -418,7 +438,7 @@ function Vote({ customer, onBack }) {
         </div>
 
         {/* 투표 상태 표시 */}
-        {hasVoted && !showResults && (
+        {hasVoted && showResults && !isEditMode && (
           <div style={{
             background: 'rgba(76, 175, 80, 0.2)',
             border: '2px solid #4caf50',
@@ -428,49 +448,60 @@ function Vote({ customer, onBack }) {
             textAlign: 'center'
           }}>
             <div style={{ color: '#4caf50', fontSize: '16px', fontWeight: '600' }}>
-              ✓ 이미 투표하셨습니다
+              ✓ 투표 완료
             </div>
             <div style={{ color: 'var(--lavender)', fontSize: '14px', marginTop: '5px' }}>
-              투표를 수정하거나 결과를 확인할 수 있습니다
+              투표 결과를 확인하거나 수정할 수 있습니다
             </div>
           </div>
         )}
 
         {/* 투표 옵션 또는 결과 */}
-        {showResults || (hasVoted && !submitting) ? (
+        {showResults && !isEditMode ? (
           // 결과 보기 모드
           <div>
-            <h3 style={{ 
-              color: 'var(--gold)', 
-              marginBottom: '20px',
+            <div style={{
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: 'center'
+              alignItems: 'center',
+              marginBottom: '20px'
             }}>
-              <span>📊 투표 결과</span>
+              <h3 style={{ color: 'var(--gold)', margin: 0 }}>
+                📊 투표 결과
+              </h3>
               {hasVoted && (
                 <button
                   onClick={handleEditVote}
                   style={{
-                    background: 'rgba(138, 43, 226, 0.3)',
-                    color: 'var(--gold)',
-                    border: '2px solid var(--purple-light)',
-                    padding: '8px 16px',
+                    background: 'var(--gradient-button)',
+                    color: 'white',
+                    border: '2px solid var(--gold)',
+                    padding: '10px 20px',
                     borderRadius: '10px',
                     fontSize: '14px',
-                    fontWeight: '600',
+                    fontWeight: '700',
                     cursor: 'pointer',
-                    transition: 'all 0.3s'
+                    transition: 'all 0.3s',
+                    boxShadow: '0 5px 15px rgba(138, 43, 226, 0.4)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(138, 43, 226, 0.6)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 5px 15px rgba(138, 43, 226, 0.4)';
                   }}
                 >
                   ✏️ 투표 수정
                 </button>
               )}
-            </h3>
+            </div>
+
             {options.map((option) => {
               const votes = voteResults[option.id] || 0;
               const percentage = getOptionPercentage(option.id);
-              const isMyChoice = selectedOptions.includes(option.id);
+              const isMyChoice = myVote && (myVote.selected_options || []).includes(option.id);
 
               return (
                 <div
@@ -518,7 +549,7 @@ function Vote({ customer, onBack }) {
                         alignItems: 'center',
                         gap: '8px'
                       }}>
-                        {isMyChoice && <span>✓</span>}
+                        {isMyChoice && <span style={{ fontSize: '18px' }}>✓</span>}
                         {option.text}
                       </div>
                       <div style={{ 
@@ -539,29 +570,32 @@ function Vote({ customer, onBack }) {
                 </div>
               );
             })}
+          </div>
+        ) : (
+          // 투표하기/수정 모드
+          <div>
+            <h3 style={{ color: 'var(--gold)', marginBottom: '20px' }}>
+              🗳️ {hasVoted && isEditMode ? '투표 수정하기' : '투표하기'}
+            </h3>
 
-            {hasVoted && (
+            {hasVoted && isEditMode && (
               <div style={{
-                background: 'rgba(138, 43, 226, 0.1)',
-                border: '2px solid var(--purple-light)',
+                background: 'rgba(255, 215, 0, 0.1)',
+                border: '2px solid var(--gold)',
                 borderRadius: '15px',
                 padding: '15px',
-                marginTop: '20px',
+                marginBottom: '20px',
                 textAlign: 'center'
               }}>
-                <div style={{ color: 'var(--lavender)', fontSize: '14px' }}>
-                  💡 투표를 수정하려면 "투표 수정" 버튼을 눌러주세요
+                <div style={{ color: 'var(--gold)', fontSize: '16px', fontWeight: '600' }}>
+                  ✏️ 수정 모드
+                </div>
+                <div style={{ color: 'var(--lavender)', fontSize: '14px', marginTop: '5px' }}>
+                  원하는 항목을 다시 선택해주세요
                 </div>
               </div>
             )}
-          </div>
-        ) : (
-          // 투표하기 모드
-          <div>
-            <h3 style={{ color: 'var(--gold)', marginBottom: '20px' }}>
-              🗳️ 투표하기
-              {hasVoted && <span style={{ color: 'var(--lavender)', fontSize: '14px', marginLeft: '10px' }}>(수정 모드)</span>}
-            </h3>
+
             {options.map((option) => {
               const isSelected = selectedOptions.includes(option.id);
 
@@ -615,18 +649,33 @@ function Vote({ customer, onBack }) {
               );
             })}
 
-            <button
-              className="btn btn-primary"
-              onClick={handleSubmitVote}
-              disabled={submitting || selectedOptions.length === 0}
-              style={{ 
-                width: '100%',
-                marginTop: '20px',
-                padding: '18px'
-              }}
-            >
-              {submitting ? '처리 중...' : hasVoted ? '✏️ 투표 수정하기' : '✓ 투표하기'}
-            </button>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button
+                className="btn btn-primary"
+                onClick={handleSubmitVote}
+                disabled={submitting || selectedOptions.length === 0}
+                style={{ 
+                  flex: 1,
+                  padding: '18px'
+                }}
+              >
+                {submitting ? '처리 중...' : hasVoted && isEditMode ? '✏️ 투표 수정 완료' : '✓ 투표하기'}
+              </button>
+
+              {hasVoted && isEditMode && (
+                <button
+                  className="btn-back"
+                  onClick={handleCancelEdit}
+                  disabled={submitting}
+                  style={{ 
+                    flex: 1,
+                    padding: '18px'
+                  }}
+                >
+                  취소
+                </button>
+              )}
+            </div>
 
             {message.text && (
               <div className={`message ${message.type}`}>
