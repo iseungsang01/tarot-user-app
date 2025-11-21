@@ -126,11 +126,9 @@ function CouponView({ customer, onBack, onCouponUsed }) {
 
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    return `${month}월${day}일`;
   };
 
   const isExpired = (validUntil) => {
@@ -147,130 +145,110 @@ function CouponView({ customer, onBack, onCouponUsed }) {
     return (
       <div
         key={coupon.id}
-        className="mobile-coupon-card"
         onClick={() => !expired && handleSelectCoupon(coupon)}
         style={{
           background: expired ? 'rgba(100, 100, 100, 0.3)' : 'rgba(138, 43, 226, 0.2)',
-          border: `3px solid ${expired ? '#666' : color}`,
-          borderRadius: '15px',
-          padding: '20px',
-          marginBottom: '15px',
+          border: `2px solid ${expired ? '#666' : color}`,
+          borderRadius: '10px',
+          padding: '12px',
+          marginBottom: '10px',
           opacity: expired ? 0.5 : 1,
           cursor: expired ? 'not-allowed' : 'pointer',
-          transition: 'all 0.3s',
+          transition: 'all 0.2s',
           position: 'relative'
         }}
       >
-        {expired && (
-          <div style={{
-            position: 'absolute',
-            top: '10px',
-            right: '10px',
-            background: '#ff4444',
-            color: 'white',
-            padding: '5px 10px',
-            borderRadius: '20px',
-            fontSize: '12px',
-            fontWeight: '700'
-          }}>
-            만료됨
-          </div>
-        )}
-
         <div style={{ 
           display: 'flex', 
-          alignItems: 'center', 
-          gap: '15px',
-          marginBottom: '15px'
+          alignItems: 'flex-start',
+          gap: '10px'
         }}>
           <div style={{ 
-            fontSize: '50px',
-            filter: expired ? 'grayscale(100%)' : 'none'
+            fontSize: '32px',
+            filter: expired ? 'grayscale(100%)' : 'none',
+            lineHeight: '1'
           }}>
             {icon}
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ 
-              color: expired ? '#999' : color,
-              fontSize: '14px',
-              fontWeight: '600',
-              marginBottom: '5px'
-            }}>
-              {isStamp ? '스탬프 쿠폰' : '생일 쿠폰'}
-            </div>
-            <div style={{ 
-              color: expired ? '#999' : color,
-              fontSize: '20px',
-              fontWeight: '700',
-              fontFamily: 'monospace',
-              letterSpacing: '1px'
-            }}>
-              {coupon.coupon_code}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: '8px',
-          fontSize: '14px'
-        }}>
-          <div style={{ 
-            display: 'flex',
-            justifyContent: 'space-between',
-            color: '#e0b0ff'
-          }}>
-            <span>발급일</span>
-            <span style={{ fontWeight: '600' }}>
-              {formatDate(coupon.issued_at)}
-            </span>
-          </div>
-          
-          {coupon.valid_until ? (
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ 
               display: 'flex',
               justifyContent: 'space-between',
-              color: expired ? '#ff6b6b' : '#4caf50',
-              fontWeight: '600'
+              alignItems: 'center',
+              marginBottom: '6px'
             }}>
-              <span>만료일</span>
-              <span>{formatDate(coupon.valid_until)}</span>
+              <div style={{ 
+                color: expired ? '#999' : color,
+                fontSize: '13px',
+                fontWeight: '700'
+              }}>
+                {isStamp ? '⭐ 스탬프 쿠폰' : '🎂 생일 쿠폰'}
+              </div>
+              {expired && (
+                <div style={{
+                  background: '#ff4444',
+                  color: 'white',
+                  padding: '3px 8px',
+                  borderRadius: '12px',
+                  fontSize: '10px',
+                  fontWeight: '700',
+                  whiteSpace: 'nowrap'
+                }}>
+                  만료
+                </div>
+              )}
             </div>
-          ) : isStamp && (
-            <div style={{ 
-              textAlign: 'center',
-              color: '#4caf50',
-              fontWeight: '600',
-              padding: '10px',
-              background: 'rgba(76, 175, 80, 0.2)',
-              borderRadius: '8px'
-            }}>
-              ⏰ 무제한 사용 가능
-            </div>
-          )}
-        </div>
 
-        {!expired && (
-          <div style={{
-            marginTop: '15px',
-            padding: '12px',
-            background: `${color}22`,
-            borderRadius: '10px',
-            textAlign: 'center',
-            color: color,
-            fontSize: '14px',
-            fontWeight: '600'
-          }}>
-            👆 탭하여 사용하기
+            <div style={{ 
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '6px',
+              fontSize: '11px',
+              color: '#e0b0ff'
+            }}>
+              <div>
+                <div style={{ opacity: 0.7, marginBottom: '2px' }}>발급</div>
+                <div style={{ fontWeight: '600' }}>
+                  {formatDate(coupon.issued_at).replace(/\s/g, '')}
+                </div>
+              </div>
+              <div>
+                <div style={{ opacity: 0.7, marginBottom: '2px' }}>만료</div>
+                <div style={{ 
+                  fontWeight: '600',
+                  color: coupon.valid_until 
+                    ? (expired ? '#ff6b6b' : '#4caf50')
+                    : '#4caf50'
+                }}>
+                  {coupon.valid_until 
+                    ? formatDate(coupon.valid_until).replace(/\s/g, '')
+                    : '무제한'}
+                </div>
+              </div>
+            </div>
+
+            {!expired && (
+              <div style={{
+                marginTop: '8px',
+                padding: '6px',
+                background: `${color}22`,
+                borderRadius: '6px',
+                textAlign: 'center',
+                color: color,
+                fontSize: '11px',
+                fontWeight: '600'
+              }}>
+                👆 탭하여 사용
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     );
   };
 
   return (
-    <div className="coupon-view" style={{ paddingBottom: '100px' }}>
+    <div className="coupon-view" style={{ paddingBottom: '80px' }}>
       {/* 헤더 */}
       <div style={{
         background: 'linear-gradient(135deg, #1a0033 0%, #2d004d 100%)',
@@ -389,62 +367,85 @@ function CouponView({ customer, onBack, onCouponUsed }) {
           className="use-form-container"
           style={{
             background: 'linear-gradient(135deg, #2d004d 0%, #1a0033 100%)',
-            border: '3px solid #ffd700',
-            borderRadius: '20px',
-            padding: '25px',
-            marginBottom: '20px',
-            boxShadow: '0 20px 60px rgba(255, 215, 0, 0.4)',
+            border: '2px solid #ffd700',
+            borderRadius: '12px',
+            padding: '15px',
+            marginBottom: '12px',
+            boxShadow: '0 10px 30px rgba(255, 215, 0, 0.3)',
             animation: 'slideDown 0.3s ease-out'
           }}
         >
-          <h3 style={{
-            color: '#ffd700',
-            fontSize: '22px',
-            marginBottom: '15px',
-            textAlign: 'center'
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '12px'
           }}>
-            🔐 쿠폰 사용 확인
-          </h3>
+            <h3 style={{
+              color: '#ffd700',
+              fontSize: '15px',
+              fontWeight: '700',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <span>🔐</span>
+              쿠폰 사용
+            </h3>
+            <button
+              onClick={handleCancelUse}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#ff6b6b',
+                fontSize: '20px',
+                cursor: 'pointer',
+                padding: '4px'
+              }}
+            >
+              ✕
+            </button>
+          </div>
 
           <div style={{
             background: 'rgba(138, 43, 226, 0.3)',
-            border: '2px solid #8a2be2',
-            borderRadius: '12px',
-            padding: '15px',
-            marginBottom: '20px',
-            textAlign: 'center'
+            border: '1px solid #8a2be2',
+            borderRadius: '8px',
+            padding: '10px',
+            marginBottom: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
           }}>
-            <div style={{ 
-              fontSize: '40px',
-              marginBottom: '10px'
-            }}>
+            <div style={{ fontSize: '28px' }}>
               {getCouponType(selectedCoupon.coupon_code) === 'birthday' ? '🎂' : '⭐'}
             </div>
-            <div style={{
-              color: '#e0b0ff',
-              fontSize: '14px',
-              marginBottom: '5px'
-            }}>
-              선택한 쿠폰
-            </div>
-            <div style={{
-              color: '#ffd700',
-              fontSize: '20px',
-              fontWeight: '700',
-              fontFamily: 'monospace'
-            }}>
-              {selectedCoupon.coupon_code}
+            <div style={{ flex: 1 }}>
+              <div style={{
+                color: '#e0b0ff',
+                fontSize: '10px',
+                marginBottom: '2px'
+              }}>
+                선택한 쿠폰
+              </div>
+              <div style={{
+                color: '#ffd700',
+                fontSize: '14px',
+                fontWeight: '700',
+                fontFamily: 'monospace'
+              }}>
+                {selectedCoupon.coupon_code}
+              </div>
             </div>
           </div>
 
-          <div className="input-group" style={{ marginBottom: '15px' }}>
+          <div style={{ marginBottom: '12px' }}>
             <label style={{
               display: 'block',
               color: '#ffd700',
-              fontSize: '16px',
+              fontSize: '12px',
               fontWeight: '600',
-              marginBottom: '10px',
-              textAlign: 'left'
+              marginBottom: '6px'
             }}>
               관리자 비밀번호
             </label>
@@ -457,10 +458,10 @@ function CouponView({ customer, onBack, onCouponUsed }) {
               onKeyPress={(e) => e.key === 'Enter' && handleUseCoupon()}
               style={{
                 width: '100%',
-                padding: '18px',
-                fontSize: '18px',
+                padding: '12px',
+                fontSize: '14px',
                 border: '2px solid #8a2be2',
-                borderRadius: '12px',
+                borderRadius: '8px',
                 background: 'rgba(138, 43, 226, 0.1)',
                 color: 'white',
                 textAlign: 'center',
@@ -471,45 +472,42 @@ function CouponView({ customer, onBack, onCouponUsed }) {
 
           <div style={{ 
             display: 'flex', 
-            gap: '10px',
-            marginTop: '20px'
+            gap: '8px'
           }}>
             <button 
               onClick={handleUseCoupon}
               disabled={processing}
               style={{
                 flex: 1,
-                padding: '18px',
-                fontSize: '18px',
+                padding: '12px',
+                fontSize: '13px',
                 fontWeight: '700',
                 border: '2px solid #4caf50',
-                borderRadius: '12px',
+                borderRadius: '8px',
                 background: 'linear-gradient(135deg, #4caf50 0%, #45a049 100%)',
                 color: 'white',
                 cursor: processing ? 'not-allowed' : 'pointer',
                 opacity: processing ? 0.5 : 1,
-                boxShadow: '0 5px 15px rgba(76, 175, 80, 0.4)',
-                transition: 'all 0.3s'
+                transition: 'all 0.2s'
               }}
             >
-              {processing ? '처리 중...' : '✓ 사용하기'}
+              {processing ? '처리 중...' : '✓ 사용'}
             </button>
             <button 
               onClick={handleCancelUse}
               disabled={processing}
               style={{
                 flex: 1,
-                padding: '18px',
-                fontSize: '18px',
+                padding: '12px',
+                fontSize: '13px',
                 fontWeight: '700',
                 border: '2px solid #ff4444',
-                borderRadius: '12px',
+                borderRadius: '8px',
                 background: 'linear-gradient(135deg, #ff4444 0%, #cc0000 100%)',
                 color: 'white',
                 cursor: processing ? 'not-allowed' : 'pointer',
                 opacity: processing ? 0.5 : 1,
-                boxShadow: '0 5px 15px rgba(255, 68, 68, 0.4)',
-                transition: 'all 0.3s'
+                transition: 'all 0.2s'
               }}
             >
               ✕ 취소
@@ -520,10 +518,10 @@ function CouponView({ customer, onBack, onCouponUsed }) {
             <div 
               className={`message ${message.type}`}
               style={{ 
-                marginTop: '15px',
-                padding: '15px',
-                borderRadius: '10px',
-                fontSize: '16px',
+                marginTop: '10px',
+                padding: '10px',
+                borderRadius: '8px',
+                fontSize: '12px',
                 fontWeight: '600',
                 textAlign: 'center'
               }}
@@ -536,35 +534,34 @@ function CouponView({ customer, onBack, onCouponUsed }) {
 
       {/* 로딩 */}
       {loading ? (
-        <div className="loading" style={{ 
+        <div style={{ 
           textAlign: 'center',
-          padding: '50px',
-          fontSize: '18px',
+          padding: '30px',
+          fontSize: '14px',
           color: '#e0b0ff'
         }}>
           로딩 중...
         </div>
       ) : coupons.length === 0 ? (
-        <div className="empty-state" style={{
+        <div style={{
           textAlign: 'center',
-          padding: '60px 20px',
+          padding: '40px 20px',
           background: 'linear-gradient(135deg, #1a0033 0%, #2d004d 100%)',
-          border: '3px solid #8a2be2',
-          borderRadius: '20px',
-          margin: '20px 0'
+          border: '2px solid #8a2be2',
+          borderRadius: '12px'
         }}>
-          <div style={{ fontSize: '80px', marginBottom: '20px' }}>🎟️</div>
+          <div style={{ fontSize: '50px', marginBottom: '12px' }}>🎟️</div>
           <h3 style={{ 
             color: '#ffd700', 
-            fontSize: '24px',
-            marginBottom: '10px'
+            fontSize: '16px',
+            marginBottom: '6px'
           }}>
             보유한 쿠폰이 없습니다
           </h3>
           <p style={{ 
             color: '#e0b0ff',
-            fontSize: '16px',
-            lineHeight: '1.6'
+            fontSize: '12px',
+            lineHeight: '1.5'
           }}>
             스탬프 10개를 모아서<br />쿠폰을 받아보세요!
           </p>
@@ -573,63 +570,68 @@ function CouponView({ customer, onBack, onCouponUsed }) {
         <>
           {/* 스탬프 쿠폰 섹션 */}
           {stampCoupons.length > 0 && (
-            <div style={{ marginBottom: '30px' }}>
-              <h2 style={{
+            <div style={{ marginBottom: '15px' }}>
+              <div style={{
                 color: '#ffd700',
-                fontSize: '22px',
+                fontSize: '14px',
                 fontWeight: '700',
-                marginBottom: '15px',
+                marginBottom: '8px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px'
+                gap: '6px',
+                padding: '0 4px'
               }}>
-                <span style={{ fontSize: '28px' }}>⭐</span>
+                <span style={{ fontSize: '16px' }}>⭐</span>
                 스탬프 쿠폰 ({stampCoupons.length})
-              </h2>
+              </div>
               {stampCoupons.map(coupon => renderCouponCard(coupon, 'stamp'))}
             </div>
           )}
 
           {/* 생일 쿠폰 섹션 */}
           {birthdayCoupons.length > 0 && (
-            <div style={{ marginBottom: '30px' }}>
-              <h2 style={{
+            <div style={{ marginBottom: '15px' }}>
+              <div style={{
                 color: '#ffb6c1',
-                fontSize: '22px',
+                fontSize: '14px',
                 fontWeight: '700',
-                marginBottom: '15px',
+                marginBottom: '8px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px'
+                gap: '6px',
+                padding: '0 4px'
               }}>
-                <span style={{ fontSize: '28px' }}>🎂</span>
+                <span style={{ fontSize: '16px' }}>🎂</span>
                 생일 쿠폰 ({birthdayCoupons.length})
-              </h2>
+              </div>
               {birthdayCoupons.map(coupon => renderCouponCard(coupon, 'birthday'))}
             </div>
           )}
 
           {/* 안내 문구 */}
           <div style={{
-            background: 'rgba(138, 43, 226, 0.2)',
-            border: '2px solid #8a2be2',
-            borderRadius: '15px',
-            padding: '20px',
-            marginTop: '30px'
+            background: 'rgba(138, 43, 226, 0.15)',
+            border: '1px solid #8a2be2',
+            borderRadius: '10px',
+            padding: '12px',
+            marginTop: '15px'
           }}>
             <div style={{
               color: '#ffd700',
-              fontSize: '18px',
+              fontSize: '13px',
               fontWeight: '700',
-              marginBottom: '15px',
-              textAlign: 'center'
+              marginBottom: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
             }}>
-              💡 사용 안내
+              <span>💡</span>
+              사용 안내
             </div>
             <div style={{
               color: '#e0b0ff',
-              fontSize: '14px',
-              lineHeight: '1.8'
+              fontSize: '11px',
+              lineHeight: '1.6'
             }}>
               • 쿠폰을 탭하면 사용 화면이 나타납니다<br />
               • 관리자에게 화면을 보여주세요<br />
