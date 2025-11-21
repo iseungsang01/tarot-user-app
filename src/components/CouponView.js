@@ -174,29 +174,15 @@ function CouponView({ customer, onBack, onCouponUsed }) {
             <div style={{ 
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: 'flex-start',
+              alignItems: 'center',
               marginBottom: '6px'
             }}>
-              <div>
-                <div style={{ 
-                  color: expired ? '#999' : color,
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  marginBottom: '3px'
-                }}>
-                  {isStamp ? 'STAMP COUPON' : 'BIRTHDAY'}
-                </div>
-                {!isStamp && (
-                  <div style={{ 
-                    color: expired ? '#999' : color,
-                    fontSize: '15px',
-                    fontWeight: '700',
-                    fontFamily: 'monospace',
-                    letterSpacing: '0.5px'
-                  }}>
-                    {coupon.coupon_code}
-                  </div>
-                )}
+              <div style={{ 
+                color: expired ? '#999' : color,
+                fontSize: '13px',
+                fontWeight: '700'
+              }}>
+                {isStamp ? '⭐ 스탬프 쿠폰' : '🎂 생일 쿠폰'}
               </div>
               {expired && (
                 <div style={{
