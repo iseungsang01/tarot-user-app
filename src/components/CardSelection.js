@@ -32,8 +32,8 @@ function CardSelection({ customer, visitId, onComplete }) {
       return;
     }
 
-    if (review.length > 100) {
-      setMessage({ text: '리뷰는 100자 이내로 작성해주세요.', type: 'error' });
+    if (review.length > 5000) {
+      setMessage({ text: '리뷰는 5000자 이내로 작성해주세요.', type: 'error' });
       setTimeout(() => messageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
       return;
     }
@@ -41,15 +41,26 @@ function CardSelection({ customer, visitId, onComplete }) {
     setLoading(true);
 
     try {
+      // 1. DB에 선택한 카드만 저장 (리뷰는 저장 안 함)
       const { error } = await supabase
         .from('visit_history')
         .update({
-          selected_card: selectedCard.name,
-          card_review: review || null
+          selected_card: selectedCard.name
+          // card_review는 저장하지 않음!
         })
         .eq('id', visitId);
 
       if (error) throw error;
+
+      // 2. 리뷰는 로컬 스토리지에 저장
+      if (review && review.trim()) {
+        const reviewsKey = `tarot_reviews_${customer.phone_number}`;
+        const savedReviews = localStorage.getItem(reviewsKey);
+        const reviews = savedReviews ? JSON.parse(savedReviews) : {};
+        
+        reviews[visitId] = review.trim();
+        localStorage.setItem(reviewsKey, JSON.stringify(reviews));
+      }
 
       setMessage({ text: '✨ 카드가 저장되었습니다!', type: 'success' });
       setTimeout(() => messageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
@@ -102,15 +113,15 @@ function CardSelection({ customer, visitId, onComplete }) {
           <p className="card-description">{selectedCard.meaning}</p>
           
           <div className="input-group">
-            <label>오늘의 기록 (선택, 최대 100자)</label>
+            <label>오늘의 기록 (선택, 최대 5000자)</label>
             <textarea
               value={review}
               onChange={(e) => setReview(e.target.value)}
-              placeholder="오늘의 방문은 어떠셨나요? (100자 이내)"
-              maxLength="100"
-              rows="4"
+              placeholder="오늘의 방문은 어떠셨나요? (5000자 이내)"
+              maxLength="5000"
+              rows="10"
             />
-            <div className="char-count">{review.length}/100</div>
+            <div className="char-count">{review.length}/5000</div>
           </div>
 
           <button 
