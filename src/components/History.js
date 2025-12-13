@@ -22,14 +22,17 @@ function History({ customer, onLogout, onStartSelection, onShowCoupon }) {
   const [actualCouponCount, setActualCouponCount] = useState(0);
 
   useEffect(() => {
-    loadVisits();
-    loadActualCouponCount();
+    // 등록된 회원만 데이터 로드
+    if (customer.id && !customer.is_guest) {
+      loadVisits();
+      loadActualCouponCount();
+    } else {
+      setLoading(false);
+    }
   }, [customer.id]);
 
-  // DB에서 방문 기록 불러오고, 리뷰는 로컬에서 가져오기
   const loadVisits = async () => {
     try {
-      // 1. DB에서 방문 기록 불러오기 (리뷰 제외)
       const { data, error } = await supabase
         .from('visit_history')
         .select('*')
@@ -37,56 +40,11 @@ function History({ customer, onLogout, onStartSelection, onShowCoupon }) {
         .order('visit_date', { ascending: false });
 
       if (error) throw error;
-
-      // 2. 로컬 스토리지에서 리뷰 불러오기
-      const reviewsKey = `tarot_reviews_${customer.phone_number}`;
-      const savedReviews = localStorage.getItem(reviewsKey);
-      const reviews = savedReviews ? JSON.parse(savedReviews) : {};
-
-      // 3. 방문 기록에 로컬 리뷰 합치기
-      const visitsWithReviews = (data || []).map(visit => ({
-        ...visit,
-        card_review: reviews[visit.id] || null  // 로컬 리뷰로 덮어쓰기
-      }));
-
-      setVisits(visitsWithReviews);
+      setVisits(data || []);
     } catch (error) {
       console.error('Load visits error:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  // 로컬 스토리지에 리뷰 저장
-  const saveReviewToLocal = (visitId, reviewText) => {
-    try {
-      const reviewsKey = `tarot_reviews_${customer.phone_number}`;
-      const savedReviews = localStorage.getItem(reviewsKey);
-      const reviews = savedReviews ? JSON.parse(savedReviews) : {};
-
-      if (reviewText && reviewText.trim()) {
-        reviews[visitId] = reviewText.trim();
-      } else {
-        delete reviews[visitId];  // 빈 리뷰는 삭제
-      }
-
-      localStorage.setItem(reviewsKey, JSON.stringify(reviews));
-    } catch (error) {
-      console.error('Save review error:', error);
-    }
-  };
-
-  // 로컬 스토리지에서 리뷰 삭제
-  const deleteReviewFromLocal = (visitId) => {
-    try {
-      const reviewsKey = `tarot_reviews_${customer.phone_number}`;
-      const savedReviews = localStorage.getItem(reviewsKey);
-      const reviews = savedReviews ? JSON.parse(savedReviews) : {};
-
-      delete reviews[visitId];
-      localStorage.setItem(reviewsKey, JSON.stringify(reviews));
-    } catch (error) {
-      console.error('Delete review error:', error);
     }
   };
 
@@ -114,28 +72,24 @@ function History({ customer, onLogout, onStartSelection, onShowCoupon }) {
     setEditReview(visit.card_review || '');
   };
 
-  const handleEditSave = (visitId) => {
-    if (editReview.length > 5000) {
-      alert('리뷰는 5000자 이내로 작성해주세요.');
+  const handleEditSave = async (visitId) => {
+    if (editReview.length > 100) {
+      alert('리뷰는 100자 이내로 작성해주세요.');
       return;
     }
 
     try {
-      // 로컬에만 저장 (DB에는 저장 안 함)
-      saveReviewToLocal(visitId, editReview);
+      const { error } = await supabase
+        .from('visit_history')
+        .update({ card_review: editReview || null })
+        .eq('id', visitId);
 
-      // UI 업데이트
-      const updatedVisits = visits.map(visit => {
-        if (visit.id === visitId) {
-          return { ...visit, card_review: editReview || null };
-        }
-        return visit;
-      });
+      if (error) throw error;
 
-      setVisits(updatedVisits);
       setEditingVisit(null);
       setEditReview('');
-      alert('✨ 리뷰가 저장되었습니다!');
+      loadVisits();
+      alert('✨ 리뷰가 수정되었습니다!');
     } catch (error) {
       console.error('Edit error:', error);
       alert('수정 중 오류가 발생했습니다.');
@@ -157,7 +111,6 @@ function History({ customer, onLogout, onStartSelection, onShowCoupon }) {
     }
 
     try {
-      // 1. DB에서 방문 기록 삭제
       const { error } = await supabase
         .from('visit_history')
         .delete()
@@ -165,10 +118,6 @@ function History({ customer, onLogout, onStartSelection, onShowCoupon }) {
 
       if (error) throw error;
 
-      // 2. 로컬에서 리뷰 삭제
-      deleteReviewFromLocal(visitId);
-
-      // 3. UI 업데이트
       loadVisits();
       alert('🗑️ 기록이 삭제되었습니다.');
     } catch (error) {
@@ -191,12 +140,49 @@ function History({ customer, onLogout, onStartSelection, onShowCoupon }) {
       <div className="history-header">
         <div>
           <h1>🔮 나의 타로 기록</h1>
-          <p className="customer-name">{customer.nickname}님의 방문 기록</p>
+          <p className="customer-name">
+            {customer.nickname}님의 방문 기록
+            {customer.is_guest && <span style={{ color: '#ffa726', marginLeft: '8px' }}>(미등록)</span>}
+          </p>
         </div>
         <button className="btn btn-logout" onClick={onLogout}>
           로그아웃
         </button>
       </div>
+
+      {/* 미등록 회원 안내 */}
+      {customer.is_guest && (
+        <div style={{
+          background: 'rgba(255, 152, 0, 0.15)',
+          border: '2px solid #ff9800',
+          borderRadius: '15px',
+          padding: '15px',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <div style={{ fontSize: '28px' }}>ℹ️</div>
+          <div style={{ flex: 1 }}>
+            <div style={{
+              color: '#ffa726',
+              fontSize: '14px',
+              fontWeight: '600',
+              marginBottom: '5px'
+            }}>
+              미등록 회원입니다
+            </div>
+            <div style={{
+              color: '#e0b0ff',
+              fontSize: '13px',
+              lineHeight: '1.5'
+            }}>
+              현재 전화번호로 등록된 회원 정보가 없습니다.<br />
+              회원 가입은 매장에서 진행하실 수 있습니다.
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="stats-card">
         <div className="stat-item">
@@ -266,12 +252,12 @@ function History({ customer, onLogout, onStartSelection, onShowCoupon }) {
                         <textarea
                           value={editReview}
                           onChange={(e) => setEditReview(e.target.value)}
-                          maxLength="5000"
-                          rows="10"
+                          maxLength="100"
+                          rows="3"
                           className="edit-textarea"
-                          placeholder="리뷰를 입력하세요 (5000자 이내)"
+                          placeholder="리뷰를 입력하세요 (100자 이내)"
                         />
-                        <div className="char-count">{editReview.length}/5000</div>
+                        <div className="char-count">{editReview.length}/100</div>
                         <div className="edit-buttons">
                           <button 
                             className="btn-edit-save"

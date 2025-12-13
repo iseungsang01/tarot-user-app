@@ -17,23 +17,28 @@ function App() {
   useEffect(() => {
     // 로컬 스토리지에서 고객 정보 확인
     const savedCustomer = localStorage.getItem('tarot_customer');
+    
     if (savedCustomer) {
       const customerData = JSON.parse(savedCustomer);
       setCustomer(customerData);
       setCurrentView('history');
-      // 최신 고객 정보 로드
-      refreshCustomerData(customerData.id);
+      // 등록된 회원만 최신 고객 정보 로드
+      if (!customerData.is_guest && customerData.id) {
+        refreshCustomerData(customerData.id);
+      }
     }
   }, []);
 
-  // 고객 정보가 변경될 때마다 안 읽은 공지사항 개수 확인
+  // 고객 정보가 변경될 때마다 안 읽은 공지사항 개수 확인 (등록된 회원만)
   useEffect(() => {
-    if (customer) {
+    if (customer && !customer.is_guest && customer.id) {
       checkUnreadNotices();
     }
   }, [customer]);
 
   const refreshCustomerData = async (customerId) => {
+    if (!customerId) return; // 미등록 회원인 경우 스킵
+    
     try {
       const { data, error } = await supabase
         .from('customers')
@@ -53,7 +58,7 @@ function App() {
   };
 
   const checkUnreadNotices = async () => {
-    if (!customer) return;
+    if (!customer || customer.is_guest || !customer.id) return;
     
     try {
       // 전체 공지사항 개수
@@ -97,7 +102,7 @@ function App() {
 
   const handleCompleteSelection = () => {
     setCurrentVisitId(null);
-    if (customer) {
+    if (customer && !customer.is_guest && customer.id) {
       refreshCustomerData(customer.id);
     }
     setCurrentView('history');
@@ -116,21 +121,23 @@ function App() {
   };
 
   const handleBackToHistory = () => {
-    if (customer) {
+    if (customer && !customer.is_guest && customer.id) {
       refreshCustomerData(customer.id);
     }
     setCurrentView('history');
   };
 
   const handleCouponUsed = () => {
-    if (customer) {
+    if (customer && !customer.is_guest && customer.id) {
       refreshCustomerData(customer.id);
     }
   };
 
   const handleNoticeRead = () => {
-    // 공지사항을 읽은 후 안 읽은 개수 업데이트
-    checkUnreadNotices();
+    // 공지사항을 읽은 후 안 읽은 개수 업데이트 (등록된 회원만)
+    if (customer && !customer.is_guest && customer.id) {
+      checkUnreadNotices();
+    }
   };
 
   return (
@@ -171,7 +178,7 @@ function App() {
             <button className="nav-btn" onClick={handleShowNotice}>
               <div className="nav-icon">
                 📢
-                {unreadNoticeCount > 0 && (
+                {!customer.is_guest && customer.id && unreadNoticeCount > 0 && (
                   <span className="notification-badge">{unreadNoticeCount}</span>
                 )}
               </div>
@@ -204,7 +211,7 @@ function App() {
             <button className="nav-btn" onClick={handleShowNotice}>
               <div className="nav-icon">
                 📢
-                {unreadNoticeCount > 0 && (
+                {!customer.is_guest && customer.id && unreadNoticeCount > 0 && (
                   <span className="notification-badge">{unreadNoticeCount}</span>
                 )}
               </div>
@@ -236,7 +243,7 @@ function App() {
             <button className="nav-btn" onClick={handleShowNotice}>
               <div className="nav-icon">
                 📢
-                {unreadNoticeCount > 0 && (
+                {!customer.is_guest && customer.id && unreadNoticeCount > 0 && (
                   <span className="notification-badge">{unreadNoticeCount}</span>
                 )}
               </div>
